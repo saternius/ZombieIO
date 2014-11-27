@@ -1,0 +1,55 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+ 
+ <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+ 
+<title>HTML5 TestPage</title>
+<script src='https://cdn.firebase.com/js/client/1.0.15/firebase.js'></script>
+<script src='https://ajax.googleapis.com/ajax/libs/jquery/1.9.0/jquery.min.js'></script>
+<script src="https://cdn.socket.io/socket.io-1.2.0.js"></script>
+<script src='js/JareUtils.js'></script>
+  
+<script src='js/FPSMeter.js'></script>
+  
+<script src='js/GameLoopManager.js'></script>
+ 
+ <script src='js/Game.js'></script>
+
+
+<style>
+   
+ #screen { display:block; margin:0 auto; background-color:#F0F; }
+      
+  .fpsmeter { 
+  padding: 0;
+   margin: 0;
+  width: 100%;
+    text-align: center;
+    
+  }
+  
+  .fpsmeter p {
+     
+     margin-top: 0px;
+ 
+           margin-bottom: 0px;
+  
+  }
+
+ 
+ </style>
+<body bgcolor = "#ebe8dd">
+
+<div align = "center">
+ <h3>This is How I Die</h3><br>
+
+ <canvas id='screen' width='750' height='550'></canvas>
+
+<div id="fpscontainer"></div>
+
+</div>
+</body>
+</body>
+</html>
