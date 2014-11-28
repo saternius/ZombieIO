@@ -14,7 +14,8 @@ var players_bitten = Array();
 var players_alive = Array();
 var players_right = Array();
 var players_up = Array();
-
+var players_socket = Array();
+var dead_players = Array();
 
 var zombies_x = Array();
 var zombies_y = Array();
@@ -28,6 +29,10 @@ var stage_width = 750;
 var stage_height = 550;
 var width = 10;
 var height = 10;
+var deathTime = 150;
+var survive = 2*60;
+var gameTicks = 0;
+
 var gridX=Math.floor(stage_width/width)+1;
 var gridY=Math.floor(stage_height/height)+1;
 console.log("GridX: "+gridX);
@@ -76,6 +81,55 @@ function randomColour(){
   return Math.round(((Math.random()*255)+255)/2);
 }
 
+function resetGame(socket){
+  console.log("Game Resetting..");
+  players = Array();
+  players_x = Array();
+  players_y = Array();
+  players_colour = Array();
+  players_deathTimer = Array();
+  players_flashMod = Array();
+  players_bitten = Array();
+  players_alive = Array();
+  players_right = Array();
+  players_up = Array();
+  players_socket = Array();
+  dead_players = Array();
+
+  zombies_x = Array();
+  zombies_y = Array();
+  zombies_walk = Array();
+  zombie_timer = 20;
+  zombie_spawn = 5;
+  num_zombies = 0;
+  zomb_lagg = 6;
+
+  stage_width = 750;
+  stage_height = 550;
+  width = 10;
+  height = 10;
+  deathTime = 10;
+  survive = 2*60;
+  gameTicks = 0;
+
+  gridX=Math.floor(stage_width/width)+1;
+  gridY=Math.floor(stage_height/height)+1;
+
+
+  plane = new Array(gridX); //<- sets width
+  plane_vacancy = new Array(gridX);
+//var zombie_plane = new Array(gridX);
+  for (var x = 0; x < plane.length; x++) {
+      plane_vacancy[x] = new Array(gridY);
+      plane[x] = new Array(gridY); //<- sets height
+      for(var y = 0; y<plane[x].length; y++){
+        plane_vacancy[x][y] = Array();
+        plane[x][y] = [255,255,255];
+      }
+  }
+  socket.emit('refresh',true);
+}
+
 function getNearestPlayer(i,j){
     var closest = players[0];
     var best_dist = Math.sqrt(Math.pow((i-players_x[players[0]]),2)+Math.pow((j-players_y[players[0]]),2));
@@ -116,6 +170,7 @@ function moveZombies(){
       if(players_x[dest]==zomb_x && players_y[dest]==zomb_y){
         //PLAYER IS BITTEN!
         //console.log("Player "+dest+" was bitten.");
+        players_socket[dest].emit('bitten',true);
         players_colour[dest] = [210,178,49];
         players_bitten[dest] = true;
       }
@@ -231,14 +286,26 @@ function spawnZombies(){
   }
 }
 
-function giveFeed(id){
-  //nothing for now
+function giveFeed(id,socket,plane){
+  gameTicks++;
+  if(gameTicks%15==0){
+    survive--;
+  }
+  if(survive<-9){
+    resetGame(socket);
+  }
+  var status = {x:players_x[id], y:players_y[id], bitten:players_bitten[id], alive:players_alive[id], data:plane, time:survive};
+  if(players.indexOf(id)==-1){
+    socket.emit('status',status);
+  }else{
+    socket.emit('status',status); 
+  }
+
 }
 
 
 var logs = 0;
 var do_once = true;
-//to emit use : io.emit('chat message', msg);
 io.on('connection', function(socket){ 
     glob_socket = socket; 
   	socket.on('player_joined', function(player_id){
@@ -251,45 +318,47 @@ io.on('connection', function(socket){
       players_bitten[player_id] = false;
       players_flashMod[player_id] = 20;
       players_colour[player_id] = [randomColour(),Math.round(randomColour()/2), randomColour()];
-      players_deathTimer[player_id] = 150;
+      players_deathTimer[player_id] = deathTime;
       players_alive[player_id] = true;
       players_right[player_id] = 0;
       players_up[player_id] = 0;
       plane[p_x][p_y] = players_colour[player_id];
       plane_vacancy[p_x][p_y].push(player_id);
+      players_socket[player_id] = socket;
       console.log("plane["+p_x+"]["+p_y+"] = "+players_colour[player_id]);
       if(!players_alive[players[0]]){
         var id = players[0];
         var p_dex = players.indexOf(id);
         players.splice(p_dex,1);
         players.push(id);
-      } 
+      }
+     // giveFeed(player_id,socket); 
 	});
 
   socket.on('moveRight', function(player_id){
       players_right[player_id] = 1;
-      giveFeed(player_id);
+     // giveFeed(player_id,socket);
   });
   socket.on('moveLeft', function(player_id){
       players_right[player_id] = 2;
-      giveFeed(player_id);
+     // giveFeed(player_id,socket);
   });
   socket.on('moveDown', function(player_id){
       players_up[player_id] = 2;
-      giveFeed(player_id);
+      //giveFeed(player_id,socket);
   });
   socket.on('moveUp', function(player_id){
       players_up[player_id] = 1;
-      giveFeed(player_id);
+     // giveFeed(player_id,socket);
   });
 
   socket.on('releaseRight', function(player_id){
       players_right[player_id] = 0;
-      giveFeed(player_id);
+     // giveFeed(player_id,socket);
   });
   socket.on('releaseUp', function(player_id){
       players_up[player_id] = 0;
-      giveFeed(player_id);
+      //giveFeed(player_id,socket);
   });
 
   socket.on('player_left', function(id){
@@ -320,7 +389,11 @@ io.on('connection', function(socket){
     setInterval(function(){
       logs++;
     //  console.log("log "+logs);
+      for(var i=0; i<dead_players.length;i++){
+        giveFeed(dead_players[i],players_socket[dead_players[i]],plane);
+      }
       for(var i=0; i< players.length; i++){
+        giveFeed(players[i],players_socket[players[i]],plane);
         var id = players[i];
         if(players_alive[id]){
             var orig_x = players_x[id];
@@ -353,10 +426,11 @@ io.on('connection', function(socket){
                      }else{
                         plane[orig_x][orig_y] = players_colour[plane_vacancy[orig_x][orig_y][0]];
                      }
-                     players.splice(id,1);
+                     //players.splice(id,1);
                      var p_dex = players.indexOf(id);
                      players.splice(p_dex,1);
-                     players.push(id);
+                     //players.push(id);
+                     dead_players.push(id);
                      //make them a zombie
                      num_zombies++;
                      zombies_walk.push(4);
@@ -367,34 +441,36 @@ io.on('connection', function(socket){
                 }
              }
 
-             if(players_right[id] == 1 && players_x[id]<gridX-2){
-                  players_x[id]+=speed;
-              }else if(players_right[id] == 2 && players_x[id]>0){
-                  players_x[id]-=speed;
+
+            if(players_alive[id]){ 
+                 if(players_right[id] == 1 && players_x[id]<gridX-2){
+                      players_x[id]+=speed;
+                  }else if(players_right[id] == 2 && players_x[id]>0){
+                      players_x[id]-=speed;
+                  }
+                  if(players_up[id] == 1 && players_y[id]>0){
+                      players_y[id]-=speed;
+                  }else if(players_up[id] == 2 && players_y[id]<gridY-2){
+                      players_y[id]+=speed;
+                  }
+                  if( ((players_right[id]+players_up[id])>0)){
+                     var p_dex = plane_vacancy[orig_x][orig_y].indexOf(id);
+                     if(p_dex>-1){
+                        plane_vacancy[orig_x][orig_y].splice(p_dex,1);
+                     }
+                     if(plane_vacancy[orig_x][orig_y].length==0){
+                        plane[orig_x][orig_y] = [255,255,255];
+                     }else{
+                        plane[orig_x][orig_y] = players_colour[plane_vacancy[orig_x][orig_y][0]];
+                     }
+                     plane_vacancy[players_x[id]][players_y[id]].push(id);
+                     plane[players_x[id]][players_y[id]] = players_colour[id];
+                  }
               }
-              if(players_up[id] == 1 && players_y[id]>0){
-                  players_y[id]-=speed;
-              }else if(players_up[id] == 2 && players_y[id]<gridY-2){
-                  players_y[id]+=speed;
-              }
-              if( ((players_right[id]+players_up[id])>0)){
-                 var p_dex = plane_vacancy[orig_x][orig_y].indexOf(id);
-                 if(p_dex>-1){
-                    plane_vacancy[orig_x][orig_y].splice(p_dex,1);
-                 }
-                 if(plane_vacancy[orig_x][orig_y].length==0){
-                    plane[orig_x][orig_y] = [255,255,255];
-                 }else{
-                    plane[orig_x][orig_y] = players_colour[plane_vacancy[orig_x][orig_y][0]];
-                 }
-                 plane_vacancy[players_x[id]][players_y[id]].push(id);
-                 plane[players_x[id]][players_y[id]] = players_colour[id];
-              }
-          }
+            }
       }
       spawnZombies();
       moveZombies();
-      socket.broadcast.emit('update', plane);
     }, 75);
   }
 
