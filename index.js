@@ -80,7 +80,7 @@ function getNearestPlayer(i,j){
     var closest = players[0];
     var best_dist = Math.sqrt(Math.pow((i-players_x[players[0]]),2)+Math.pow((j-players_y[players[0]]),2));
     for(var p=1; p<players.length; p++){
-        if(players_alive[p]){
+        if(players_alive[players[p]]){
           var dist = Math.sqrt(Math.pow((i-players_x[players[p]]),2)+Math.pow((j-players_y[players[p]]),2));
           if(dist<best_dist){
             best_dist = dist;
@@ -115,7 +115,7 @@ function moveZombies(){
     if(zombies_walk[i]%2 == 0){
       if(players_x[dest]==zomb_x && players_y[dest]==zomb_y){
         //PLAYER IS BITTEN!
-        console.log("Player "+dest+" was bitten.");
+        //console.log("Player "+dest+" was bitten.");
         players_colour[dest] = [210,178,49];
         players_bitten[dest] = true;
       }
@@ -257,7 +257,13 @@ io.on('connection', function(socket){
       players_up[player_id] = 0;
       plane[p_x][p_y] = players_colour[player_id];
       plane_vacancy[p_x][p_y].push(player_id);
-      console.log("plane["+p_x+"]["+p_y+"] = "+players_colour[player_id]); 
+      console.log("plane["+p_x+"]["+p_y+"] = "+players_colour[player_id]);
+      if(!players_alive[players[0]]){
+        var id = players[0];
+        var p_dex = players.indexOf(id);
+        players.splice(p_dex,1);
+        players.push(id);
+      } 
 	});
 
   socket.on('moveRight', function(player_id){
@@ -335,6 +341,8 @@ io.on('connection', function(socket){
                       players_flashMod[id]--;
                     }
                 }else{
+                    //player is dead
+                    console.log("Player "+id+" is Dead");
                     players_alive[id] = false;
                     var p_dex = plane_vacancy[orig_x][orig_y].indexOf(id);
                      if(p_dex>-1){
@@ -345,6 +353,17 @@ io.on('connection', function(socket){
                      }else{
                         plane[orig_x][orig_y] = players_colour[plane_vacancy[orig_x][orig_y][0]];
                      }
+                     players.splice(id,1);
+                     var p_dex = players.indexOf(id);
+                     players.splice(p_dex,1);
+                     players.push(id);
+                     //make them a zombie
+                     num_zombies++;
+                     zombies_walk.push(4);
+                     zombies_x.push(players_x[id]);
+                     zombies_y.push(players_y[id]);
+                     plane[players_x[id]][players_y[id]] = [38,166,68];
+
                 }
              }
 
